@@ -129,7 +129,7 @@ async def test_integration_services_with_issue(
         )
 
     instance.update_dns_record.assert_not_called()
-    assert "Could not get external IPv4 address" in caplog.text
+    assert "Could not detect any external IP address" in caplog.text
 
 
 @pytest.mark.usefixtures("location_info")

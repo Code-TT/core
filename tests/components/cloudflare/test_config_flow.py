@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pycfdns
 
-from homeassistant.components.cloudflare.const import CONF_RECORDS, DOMAIN
+from homeassistant.components.cloudflare.const import CONF_IP_VERSION, CONF_RECORDS, DOMAIN
 from homeassistant.config_entries import SOURCE_USER
 from homeassistant.const import CONF_API_TOKEN, CONF_SOURCE, CONF_ZONE
 from homeassistant.core import HomeAssistant
@@ -13,6 +13,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from . import (
     ENTRY_CONFIG,
     USER_INPUT,
+    USER_INPUT_IP_VERSION,
     USER_INPUT_RECORDS,
     USER_INPUT_ZONE,
     patch_async_setup_entry,
@@ -48,9 +49,17 @@ async def test_user_form(hass: HomeAssistant, cfupdate_flow: MagicMock) -> None:
     await hass.async_block_till_done()
 
     assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "ip_version"
+    assert result["errors"] is None
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        USER_INPUT_IP_VERSION,
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "records"
     assert result["errors"] is None
-
     with patch_async_setup_entry() as mock_setup_entry:
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
@@ -65,6 +74,7 @@ async def test_user_form(hass: HomeAssistant, cfupdate_flow: MagicMock) -> None:
     assert result["data"][CONF_API_TOKEN] == USER_INPUT[CONF_API_TOKEN]
     assert result["data"][CONF_ZONE] == USER_INPUT_ZONE[CONF_ZONE]
     assert result["data"][CONF_RECORDS] == USER_INPUT_RECORDS[CONF_RECORDS]
+    assert result["data"][CONF_IP_VERSION] == USER_INPUT_IP_VERSION[CONF_IP_VERSION]
 
     assert result["result"]
     assert result["result"].unique_id == USER_INPUT_ZONE[CONF_ZONE]
