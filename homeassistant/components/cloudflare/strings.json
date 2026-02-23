@@ -34,6 +34,13 @@
           "zone": "Zone"
         },
         "title": "Choose the zone to update"
+      },
+      "ip_version": {
+        "data": {
+          "ip_version": "IP Version"
+        },
+        "description": "Select which IP version(s) to update. Auto mode tries IPv6 first (for DS-Lite connections), then IPv4.",
+        "title": "Select IP Version"
       }
     }
   },

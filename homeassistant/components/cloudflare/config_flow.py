@@ -16,7 +16,16 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import CONF_RECORDS, DOMAIN
+from .const import (
+    CONF_IP_VERSION,
+    CONF_RECORDS,
+    DEFAULT_IP_VERSION,
+    DOMAIN,
+    IP_VERSION_AUTO,
+    IP_VERSION_BOTH,
+    IP_VERSION_IPV4,
+    IP_VERSION_IPV6,
+)
 from .helpers import get_zone_id
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,6 +57,25 @@ def _records_schema(records: list[pycfdns.RecordModel] | None = None) -> vol.Sch
     return vol.Schema({vol.Required(CONF_RECORDS): cv.multi_select(records_dict)})
 
 
+def _ip_version_schema() -> vol.Schema:
+    """IP version selection schema."""
+    return vol.Schema(
+        {
+            vol.Required(
+                CONF_IP_VERSION,
+                default=DEFAULT_IP_VERSION,
+            ): vol.In(
+                {
+                    IP_VERSION_AUTO: "Auto (IPv6 first, then IPv4)",
+                    IP_VERSION_IPV4: "IPv4 only",
+                    IP_VERSION_IPV6: "IPv6 only",
+                    IP_VERSION_BOTH: "Both IPv4 and IPv6",
+                }
+            ),
+        }
+    )
+
+
 async def _validate_input(
     hass: HomeAssistant,
     data: dict[str, Any],
@@ -66,7 +94,9 @@ async def _validate_input(
 
     zones = await client.list_zones()
     if zone and (zone_id := get_zone_id(zone, zones)) is not None:
-        records = await client.list_dns_records(zone_id=zone_id, type="A")
+        # Get ALL DNS records and filter for A and AAAA types
+        all_records = await client.list_dns_records(zone_id=zone_id)
+        records = [r for r in all_records if r["type"] in ("A", "AAAA")]
 
     return {"zones": zones, "records": records}
 
@@ -145,12 +175,25 @@ class CloudflareConfigFlow(ConfigFlow, domain=DOMAIN):
                 await self.async_set_unique_id(user_input[CONF_ZONE])
                 self.records = info["records"]
 
-                return await self.async_step_records()
+                return await self.async_step_ip_version()
 
         return self.async_show_form(
             step_id="zone",
             data_schema=_zone_schema(self.zones),
             errors=errors,
+        )
+
+    async def async_step_ip_version(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle the IP version selection."""
+        if user_input is not None:
+            self.cloudflare_config.update(user_input)
+            return await self.async_step_records()
+
+        return self.async_show_form(
+            step_id="ip_version",
+            data_schema=_ip_version_schema(),
         )
 
     async def async_step_records(
